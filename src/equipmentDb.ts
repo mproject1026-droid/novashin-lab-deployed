@@ -5291,6 +5291,26 @@ export const equipmentDb: Equipment[] = [
     novashinVerdict: "音響界的 F-22 猛禽戰鬥機，技術力的極致展現。它的聲音沒有一絲贅肉，精準到令人髮指。這是富人中的富人才能擁有的玩具，也是聲音的終極照妖鏡。"
   },
   {
+    id: "wiim-amp-ultra",
+    brand: "WiiM",
+    model: "Amp Ultra",
+    type: "amp",
+    sonicSignature: "中性、快速、乾淨，功能性極強，背景黑度與解析力較一般版大幅提升，推力更為餘裕。",
+    pairingAdvice: "絕配高效率書架喇叭 (如 Klipsch, Triangle) 或是中小型落地。是臥室或書房的終極殺手，也是客廳的智慧中樞。",
+    physicsNote: "搭載升級版 D 類放大模組，內建完整串流功能、HDMI ARC 與更高級的 DAC 解碼核心。",
+    novashinVerdict: "破壞行情的存在。這價位買串流送擴大機，還是金屬機身與觸控螢幕，簡直太犯規了。"
+  },
+  {
+    id: "denon-pma-sx11",
+    brand: "Denon",
+    model: "PMA-SX11",
+    type: "amp",
+    sonicSignature: "極致的厚實與重量感，低頻權威性極佳，高頻圓潤不刺耳，充滿肉感的日系美聲。",
+    pairingAdvice: "UHC-MOS 的大電流特性專治軟腳喇叭。搭配 Focal 或 B&W 這種解析高的喇叭能補足肉感，形成完美的互補。",
+    physicsNote: "搭載 Advanced UHC-MOS 單端推挽電路，巨型環形變壓器，與直接機械接地結構。",
+    novashinVerdict: "這是 Denon 的靈魂。這不是普通的日系聲，這是充滿肌肉與情感的『真．發燒』聲，是能傳世的經典綜擴。"
+  },
+  {
     id: "yg-vantage",
     brand: "YG Acoustics",
     model: "Vantage",
@@ -5300,4 +5320,5 @@ export const equipmentDb: Equipment[] = [
     physicsNote: "定位於Hailey與Sonja之間，三音路設計，搭載了更大尺寸的BilletCore™低音單體，以提供更強勁的低頻表現。",
     novashinVerdict: "YG家族裡的肌肉男。它不跟你囉嗦，直接用拳拳到肉的聲音衝擊你的感官。聽馬勒、聽搖滾、看《環太平洋》，爽度絕對破錶。"
   }
+  
 ];

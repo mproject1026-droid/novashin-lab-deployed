@@ -1,41 +1,86 @@
 @import "tailwindcss";
 
 @theme {
-  /* 專業發燒級配色 - 參考 McIntosh & Accuphase */
-  --color-obsidian: #0A0A0A;           /* 純粹的黑，背景用 */
-  --color-dark-panel: #161616;         /* 儀表板深灰 */
-  --color-gold: #C9A84C;               /* 經典香檳金 */
-  --color-gold-bright: #F5E6C0;        /* 亮金（高光） */
-  --color-gold-dim: #856E2D;           /* 暗金 */
-  --color-text-main: #E5E5E5;          /* 主文字 */
+  --color-obsidian: #0A0A0A;
+  --color-dark-panel: #161616;
+  --color-gold: #C9A84C;
+  --color-gold-bright: #F5E6C0;
+  --color-gold-dim: #856E2D;
+  --color-text-main: #E5E5E5;
 }
 
 body {
   background-color: var(--color-obsidian);
   color: var(--color-text-main);
-  /* 使用更高級的襯線字體，模仿音響雜誌 */
   font-family: "Noto Sans TC", "Playfair Display", serif;
   margin: 0;
   -webkit-font-smoothing: antialiased;
 }
 
-/* 霓虹金色光暈 */
 .gold-glow {
   box-shadow: 0 0 30px rgba(201, 168, 76, 0.15);
 }
 
-/* 金色漸層文字 */
 .text-gold-gradient {
   background: linear-gradient(135deg, #F5E6C0 0%, #C9A84C 50%, #856E2D 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* 自定義選單樣式，讓它變黑 */
 select {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23C9A84C'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 1rem center;
   background-size: 1.5em;
+}
+
+/* 🖨️ 列印專用樣式 (PDF 模式) */
+@media print {
+  /* 隱藏網頁上不需要列印的元素 (選單、按鈕、網頁標題) */
+  .no-print {
+    display: none !important;
+  }
+
+  /* 強制背景變白，文字變黑 (省墨水，專業文件感) */
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+
+  .print-container {
+    background-color: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 強制 Markdown 表格樣式 */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  th, td {
+    border: 1px solid #ddd !important;
+    padding: 8px !important;
+    color: black !important;
+  }
+
+  th {
+    background-color: #f3f3f3 !important;
+    font-weight: bold !important;
+  }
+
+  /* 顯示列印專用刊頭 */
+  .hidden.print\:block {
+    display: block !important;
+  }
+
+  .hidden.print\:flex {
+    display: flex !important;
+  }
 }
