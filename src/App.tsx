@@ -2,7 +2,6 @@ import { useState, useRef } from 'react'
 import { equipmentDb, type Equipment } from './equipmentDb' 
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useReactToPrint } from 'react-to-print'
 
 const API_KEY = import.meta.env.VITE_GEMINI_KEY || "";
 
@@ -50,6 +49,7 @@ function App() {
   const [customInput, setCustomInput] = useState('') 
   const [report, setReport] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const reportRef = useRef<HTMLDivElement>(null);
 
   const handleSelect = (key: string, id: string) => {
@@ -59,10 +59,127 @@ function App() {
   const getInfo = (id: string) => equipmentDb.find(e => e.id === id)
   const commonProps: AppHelperProps = { selected, handleSelect, getInfo };
 
-  const handlePrint = useReactToPrint({
-    contentRef: reportRef,
-    documentTitle: `NovaShin_Audiology_Insight_2026`,
-  });
+  /* ===== PDF 下載 (html2pdf.js - 手機/電腦通用) ===== */
+  const handleDownloadPDF = async () => {
+    if (!reportRef.current) return;
+    setPdfLoading(true);
+
+    try {
+      // 動態載入 html2pdf.js
+      const html2pdf = (await import('html2pdf.js')).default;
+
+      // 建立一個用於 PDF 的克隆元素，套用白底黑字樣式
+      const cloneEl = reportRef.current.cloneNode(true) as HTMLElement;
+      cloneEl.style.backgroundColor = 'white';
+      cloneEl.style.color = 'black';
+      cloneEl.style.padding = '20mm';
+      cloneEl.style.borderRadius = '0';
+      cloneEl.style.border = 'none';
+
+      // 將所有文字改為黑色
+      cloneEl.querySelectorAll('*').forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        const tag = htmlEl.tagName.toLowerCase();
+        
+        // 標題
+        if (['h1', 'h2', 'h3', 'h4'].includes(tag)) {
+          htmlEl.style.color = 'black';
+          htmlEl.style.webkitTextFillColor = 'black';
+        }
+        // 段落、列表
+        if (['p', 'li', 'span', 'td', 'th'].includes(tag)) {
+          htmlEl.style.color = 'black';
+        }
+        // 粗體
+        if (tag === 'strong') {
+          htmlEl.style.color = 'black';
+        }
+        // 引用區塊
+        if (tag === 'blockquote') {
+          htmlEl.style.borderLeftColor = '#999';
+          htmlEl.style.backgroundColor = '#f5f5f5';
+        }
+        // 表格表頭
+        if (tag === 'th') {
+          htmlEl.style.backgroundColor = '#f3f3f3';
+          htmlEl.style.borderColor = '#ddd';
+        }
+        // 表格儲存格
+        if (tag === 'td') {
+          htmlEl.style.borderColor = '#ddd';
+        }
+      });
+
+      // report-header 區域特殊處理
+      const headerTitle = cloneEl.querySelector('.report-header-title') as HTMLElement;
+      if (headerTitle) {
+        headerTitle.style.color = 'black';
+        headerTitle.style.webkitTextFillColor = 'black';
+        headerTitle.querySelectorAll('span').forEach(s => {
+          s.style.color = 'black';
+          s.style.webkitTextFillColor = 'black';
+        });
+      }
+      const badge = cloneEl.querySelector('.report-header-badge') as HTMLElement;
+      if (badge) {
+        badge.style.backgroundColor = '#333';
+        badge.style.color = 'white';
+      }
+      const subtitle = cloneEl.querySelector('.report-header-subtitle') as HTMLElement;
+      if (subtitle) subtitle.style.color = '#666';
+      const cert = cloneEl.querySelector('.report-header-cert') as HTMLElement;
+      if (cert) cert.style.color = '#666';
+      const divider = cloneEl.querySelector('.report-header-divider') as HTMLElement;
+      if (divider) divider.style.backgroundColor = '#ccc';
+      const headerId = cloneEl.querySelector('.report-header-id') as HTMLElement;
+      if (headerId) headerId.style.color = '#999';
+
+      // 頁尾
+      const footer = cloneEl.querySelector('.report-footer') as HTMLElement;
+      if (footer) {
+        footer.style.borderTopColor = '#ddd';
+        footer.style.color = '#999';
+      }
+
+      // 頂部金色線條移除
+      const topLine = cloneEl.querySelector('div[style*="height: 2px"]') as HTMLElement;
+      if (topLine) topLine.style.background = '#ddd';
+
+      // H2 底線
+      cloneEl.querySelectorAll('.report-content h2').forEach(el => {
+        (el as HTMLElement).style.borderBottomColor = '#ddd';
+      });
+
+      // hr
+      cloneEl.querySelectorAll('.report-content hr').forEach(el => {
+        (el as HTMLElement).style.borderTopColor = '#ddd';
+      });
+
+      // marker 顏色無法直接改，但列印時不影響
+
+      const opt = {
+        margin:       [15, 18, 15, 18], // 上右下左 mm
+        filename:     'NovaShin_Audiology_Insight_2026.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { 
+          scale: 2, 
+          useCORS: true,
+          letterRendering: true,
+          logging: false,
+        },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+
+      await html2pdf().set(opt).from(cloneEl).save();
+
+    } catch (error: any) {
+      console.error('PDF 生成失敗:', error);
+      alert('PDF 下載失敗，請重試。');
+    }
+
+    setPdfLoading(false);
+  };
 
   const generateDiagnosis = async () => {
     const hasSelection = Object.values(selected).some(v => v !== '') || customInput.trim() !== '';
@@ -271,8 +388,12 @@ ${dbContext}
           </button>
           {report && (
             <div>
-              <button onClick={() => handlePrint()} className="text-gold-bright/30 hover:text-gold-bright text-xs font-black tracking-[0.5em] transition-all underline underline-offset-8">
-                DOWNLOAD PDF CERTIFICATE ↓
+              <button 
+                onClick={handleDownloadPDF} 
+                disabled={pdfLoading}
+                className="text-gold-bright/30 hover:text-gold-bright text-xs font-black tracking-[0.5em] transition-all underline underline-offset-8"
+              >
+                {pdfLoading ? 'GENERATING PDF...' : 'DOWNLOAD PDF CERTIFICATE ↓'}
               </button>
             </div>
           )}

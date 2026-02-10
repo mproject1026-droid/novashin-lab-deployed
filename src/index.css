@@ -338,6 +338,11 @@ select {
 /* ============================================
    列印專用樣式 (PDF 模式)
    ============================================ */
+@page {
+  size: A4;
+  margin: 20mm 22mm 20mm 22mm;
+}
+
 @media print {
   .no-print {
     display: none !important;
@@ -347,6 +352,8 @@ select {
     background-color: white !important;
     color: black !important;
     font-size: 12px !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .print-container {
@@ -354,9 +361,11 @@ select {
     border: none !important;
     box-shadow: none !important;
     color: black !important;
-    padding: 0 !important;
+    padding: 10mm 12mm !important;
     margin: 0 !important;
     border-radius: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
   }
 
   .report-header-title {
