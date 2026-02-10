@@ -72,7 +72,7 @@ function App() {
       const cloneEl = reportRef.current.cloneNode(true) as HTMLElement;
       cloneEl.style.backgroundColor = 'white';
       cloneEl.style.color = 'black';
-      cloneEl.style.padding = '20mm';
+      cloneEl.style.padding = '0';
       cloneEl.style.borderRadius = '0';
       cloneEl.style.border = 'none';
 
@@ -158,7 +158,7 @@ function App() {
       // marker 顏色無法直接改，但列印時不影響
 
       const opt = {
-        margin:       [15, 18, 15, 18], // 上右下左 mm
+        margin:       [25, 28, 25, 28], // 上右下左 mm（對齊參考 PDF 約 25-28mm 邊距）
         filename:     'NovaShin_Audiology_Insight_2026.pdf',
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { 
