@@ -1,71 +1,111 @@
 import { useState, useRef, useMemo } from 'react'
-import { equipmentDb, type Equipment } from './equipmentDb' 
+import { equipmentDb } from './equipmentDb' 
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 const API_KEY = import.meta.env.VITE_GEMINI_KEY || "";
 
-// 狀態現在改為儲存：{ brand, model }
-type SelectedState = Record<string, { brand: string; model: string }>;
+// 系統類別定義
+const CATEGORIES = [
+  { key: 'source', label: '訊源' },
+  { key: 'dac', label: 'DAC' },
+  { key: 'preamp', label: '前級' },
+  { key: 'poweramp', label: '後級' },
+  { key: 'intamp', label: '綜合擴大機' },
+  { key: 'speaker', label: '喇叭' },
+  { key: 'stand', label: '腳座' },
+  { key: 'cable', label: '電線' },
+];
+
+export interface Equipment {
+  id: string;
+  brand: string;
+  model: string;
+  type: string;
+  sonicSignature: string;
+  pairingAdvice: string;
+  physicsNote: string;
+  novashinVerdict: string;
+}
 
 const App = () => {
-  const [selected, setSelected] = useState<SelectedState>({});
+  const [selected, setSelected] = useState<Record<string, { brand: string; model: string }>>({});
   const [report, setReport] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
-  // 1. 理性提取品牌清單 (從你現有的 500 多筆資料自動生成)
-  const allBrands = useMemo(() => {
-    const brands = Array.from(new Set(equipmentDb.map(e => e.brand)));
-    return brands.sort((a, b) => a.localeCompare(b));
+  // 僅從 equipmentDb 提取品牌清單作為選單使用，完全不讀取其器材屬性資料
+  const brandList = useMemo(() => {
+    return Array.from(new Set(equipmentDb.map(e => e.brand))).sort();
   }, []);
 
-  const handleInputChange = (stateKey: string, field: 'brand' | 'model', value: string) => {
+  const handleInputChange = (key: string, field: 'brand' | 'model', value: string) => {
     setSelected(prev => ({
       ...prev,
-      [stateKey]: { ...prev[stateKey], [field]: value }
+      [key]: { ...prev[key] || { brand: '', model: '' }, [field]: value }
     }));
   };
 
-  // 2. 核心邏輯：先在資料庫找，找不到才叫 AI
-  const fetchEquipmentInfo = async (brand: string, model: string, type: string): Promise<Equipment> => {
-    // 優先匹配資料庫
-    const match = equipmentDb.find(e => 
-      e.brand.toLowerCase() === brand.toLowerCase() && 
-      e.model.toLowerCase() === model.toLowerCase()
-    );
-    if (match) return match;
-
-    // 資料庫沒有，啟動 AI Studio
-    const prompt = `你是一位音響專家 Novashin。分析器材：[${brand}] [${model}]，類別：[${type}]。
-    回傳 JSON：{ "id": "custom", "brand": "${brand}", "model": "${model}", "type": "${type}", "sonicSignature": "...", "pairingAdvice": "...", "physicsNote": "...", "novashinVerdict": "..." }
-    (Verdict 請保持你犀利、幽默、帶點毒舌的風格)`;
+  // 完全依賴 LLM 的資料獲取邏輯
+  const fetchEquipmentInfoFromAI = async (brand: string, model: string, categoryLabel: string): Promise<Equipment> => {
+    const prompt = `分析目標：品牌 [${brand}]，型號 [${model}]，設備類別 [${categoryLabel}]。
+請基於客觀聲學數據與市場評價，提供以下 JSON 格式的結構化資料，不輸出任何其他文字：
+{
+  "id": "ai-${Date.now()}",
+  "brand": "${brand}",
+  "model": "${model}",
+  "type": "${categoryLabel}",
+  "sonicSignature": "客觀描述其頻段分佈、動態表現與聲音特徵。",
+  "pairingAdvice": "基於電氣特性（如阻抗、靈敏度、功率需求）的搭配建議。",
+  "physicsNote": "核心硬體架構、單體材質、解碼晶片等物理規格描述。",
+  "novashinVerdict": "專業、具備批判性與個人觀點的總結評價。"
+}`;
 
     try {
       const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        body: JSON.stringify({ 
+          contents: [{ parts: [{ text: prompt }] }],
+          // 強制指定回傳格式為 JSON
+          generationConfig: { response_mime_type: "application/json" } 
+        })
       });
       const data = await resp.json();
       const text = data.candidates[0].content.parts[0].text;
-      return JSON.parse(text.replace(/```json|```/g, ""));
+      return JSON.parse(text);
     } catch (e) {
-      return { id: 'err', brand, model, type: type as any, sonicSignature: "無法解析", pairingAdvice: "查無資料", physicsNote: "查無資料", novashinVerdict: "這台我沒聽過，可能太稀有了。" };
+      return { 
+        id: 'error', brand, model, type: categoryLabel, 
+        sonicSignature: "API 請求失敗或超時。", 
+        pairingAdvice: "無法取得資料。", 
+        physicsNote: "無法取得資料。", 
+        novashinVerdict: "系統無法解析此設備。" 
+      };
     }
   };
 
   const generateReport = async () => {
     const activeKeys = Object.keys(selected).filter(k => selected[k]?.brand && selected[k]?.model);
-    if (activeKeys.length === 0) return alert("請填寫器材");
+    if (activeKeys.length === 0) return alert("系統錯誤：未檢測到有效輸入參數。");
 
     setLoading(true);
-    let fullReport = `# NOVASHIN LAB 診斷報告\n\n`;
+    let fullReport = `# NOVASHIN LAB 系統分析報告\n\n`;
 
-    const results = await Promise.all(activeKeys.map(k => fetchEquipmentInfo(selected[k].brand, selected[k].model, k)));
+    // 併發處理所有已輸入的器材，提升 API 請求效率
+    const results = await Promise.all(
+      activeKeys.map(k => {
+        const catLabel = CATEGORIES.find(c => c.key === k)?.label || '未分類';
+        return fetchEquipmentInfoFromAI(selected[k].brand, selected[k].model, catLabel);
+      })
+    );
 
     results.forEach(info => {
-      fullReport += `## ${info.brand} ${info.model}\n\n**聲音特徵**：${info.sonicSignature}\n\n**搭配建議**：${info.pairingAdvice}\n\n**技術筆記**：${info.physicsNote}\n\n> **Novashin 總結**：${info.novashinVerdict}\n\n---\n\n`;
+      fullReport += `## 【${info.brand}】${info.model} (${info.type})\n`;
+      fullReport += `**聲音特徵**：${info.sonicSignature}\n\n`;
+      fullReport += `**搭配建議**：${info.pairingAdvice}\n\n`;
+      fullReport += `**技術筆記**：${info.physicsNote}\n\n`;
+      fullReport += `> **Novashin 總結**：${info.novashinVerdict}\n\n---\n\n`;
     });
 
     setReport(fullReport);
@@ -73,64 +113,55 @@ const App = () => {
     setTimeout(() => reportRef.current?.scrollIntoView({ behavior: 'smooth' }), 500);
   };
 
-  // 3. 恢復你原本的高級感 UI 渲染
-  const renderSection = (stateKey: string, label: string, index: number) => (
-    <div key={stateKey} className="flex-1 min-w-[280px] mb-8 no-print p-4 bg-dark-panel rounded-lg border border-gold/10">
-      <label className="text-gold-dim text-[11px] font-black tracking-[0.2em] mb-4 block uppercase opacity-60">
-        <span className="bg-gold text-black px-2 py-0.5 mr-2">{index}</span> {label}
-      </label>
-      
-      <div className="space-y-3">
-        {/* 品牌選擇 */}
-        <select 
-          className="w-full bg-obsidian border border-gold/20 p-3 text-sm text-white focus:border-gold outline-none transition-all"
-          onChange={(e) => handleInputChange(stateKey, 'brand', e.target.value)}
-        >
-          <option value="">選擇品牌</option>
-          {allBrands.map(b => <option key={b} value={b}>{b}</option>)}
-          <option value="Other">其他品牌</option>
-        </select>
-
-        {/* 型號輸入 */}
-        <input 
-          placeholder="輸入型號 (例如: C2700)" 
-          className="w-full bg-obsidian border border-gold/20 p-3 text-sm text-white focus:border-gold outline-none transition-all placeholder:opacity-30"
-          onChange={(e) => handleInputChange(stateKey, 'model', e.target.value)}
-        />
-      </div>
-    </div>
-  );
-
   return (
-    <div className="min-h-screen bg-obsidian text-text-main font-sans selection:bg-gold selection:text-black">
-      <main className="max-w-7xl mx-auto px-6 py-20">
-        <header className="mb-20 text-center relative">
-          <h1 className="text-6xl font-black tracking-[-0.05em] mb-4 text-gold-gradient">PROJECT MANHATTAN</h1>
-          <div className="text-gold tracking-[0.5em] text-xs opacity-50 uppercase">Audio System Analysis Architecture</div>
+    <div className="min-h-screen bg-obsidian text-text-main p-8 font-sans">
+      <div className="max-w-7xl mx-auto">
+        <header className="mb-12 text-center">
+          <h1 className="text-5xl font-black text-gold-gradient tracking-tighter mb-4">PROJECT MANHATTAN</h1>
+          <div className="text-gold-dim tracking-[0.3em] text-xs uppercase opacity-60">LLM 驅動即時聲學分析系統</div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {renderSection('source', 'Digital Source', 1)}
-          {renderSection('dac', 'D/A Converter', 2)}
-          {renderSection('amp', 'Amplifier', 3)}
-          {renderSection('speaker', 'Loudspeakers', 4)}
+          {CATEGORIES.map((cat, idx) => (
+            <div key={cat.key} className="bg-dark-panel p-5 rounded-lg border border-gold/10 relative">
+              <label className="text-gold-dim text-[11px] font-black tracking-[0.2em] mb-4 flex items-center opacity-60">
+                <span className="bg-gold text-black px-2 py-0.5 mr-2">{idx + 1}</span> {cat.label}
+              </label>
+              
+              <div className="space-y-3">
+                <select 
+                  className="w-full bg-obsidian border border-gold/20 p-3 text-sm text-white focus:border-gold outline-none"
+                  onChange={(e) => handleInputChange(cat.key, 'brand', e.target.value)}
+                >
+                  <option value="">選擇品牌</option>
+                  {brandList.map(b => <option key={b} value={b}>{b}</option>)}
+                  <option value="Other">自訂品牌</option>
+                </select>
+
+                <input 
+                  placeholder="輸入型號" 
+                  className="w-full bg-obsidian border border-gold/20 p-3 text-sm text-white focus:border-gold outline-none"
+                  onChange={(e) => handleInputChange(cat.key, 'model', e.target.value)}
+                />
+              </div>
+            </div>
+          ))}
         </div>
 
         <button 
           onClick={generateReport}
           disabled={loading}
-          className="w-full mt-12 py-6 bg-gold text-black font-black uppercase tracking-[0.8em] hover:bg-gold-bright transition-all disabled:opacity-30"
+          className="w-full mt-12 py-5 bg-gold text-black font-black uppercase tracking-[0.5em] hover:bg-gold-bright transition-all disabled:opacity-30 cursor-pointer"
         >
-          {loading ? "DATA SYNTHESIZING..." : "EXECUTE ANALYSIS"}
+          {loading ? "DATA SYNTHESIZING..." : "EXECUTE LLM ANALYSIS"}
         </button>
 
-        {/* 報告顯示區 (保留你原本精美的 Markdown 樣式) */}
         {report && (
-          <div ref={reportRef} className="report-wrapper mt-20 p-10 bg-white text-black relative">
+          <div ref={reportRef} className="mt-16 bg-white p-10 text-black shadow-2xl relative">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{report}</ReactMarkdown>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }
